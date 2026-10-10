@@ -31,6 +31,14 @@ with no variant of its own can also be skipped from the type,
 A port of the Rust crate [logos](https://github.com/maciejhirsz/logos), in the
 shape Meadow's macros make possible.
 
+## AI disclosure
+
+Scythe is written with AI coding agents: Anthropic's Claude, through Claude
+Code. Most of the code, the tests, the documentation and the commit messages in
+this repository were written by an agent, under the direction of the project's
+author, who decides the design and what goes in. Read it, and rely on it, with
+that in mind.
+
 ## What it does
 
 `@derive(Lexer)` reads the patterns off the variants and builds a deterministic
