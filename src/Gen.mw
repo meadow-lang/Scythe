@@ -24,6 +24,7 @@ use Std.Macro.TokenTree.*
 use Std.Macro.Delim.*
 use Std.Macro.Loc.*
 use Std.Collections.Vector as V
+use Std.Char as C
 use Std.String as S
 use Std.Maybe.Maybe.*
 use Std.Result.Result.*
@@ -149,13 +150,13 @@ fun patternOf v =
     | Ok re -> Ok re
   else Err "`${ctorOf v}` says nothing about what it matches: give it a `@token` or a `@regex`"
 
--- Text as a pattern that matches exactly it.
-fun quoted s =
-  V.foldl (\acc b -> acc ++ escaped b) "" (V.fromArray (S.toBytes s))
+-- Text as a pattern that matches exactly it: a character at a time, since a
+-- byte of a character of several is no text of its own, and the pattern is
+-- text before it is bytes.
+fun quoted s = V.foldl (\acc c -> acc ++ escaped c) "" (S.chars s)
 
-fun escaped b =
-  let c = S.fromBytes #[b] in
-  if V.elem (toInt b) metaBytes then "\\${c}" else c
+fun escaped c =
+  if V.elem (C.code c) metaBytes then "\\${C.toString c}" else C.toString c
 
 def metaBytes = [40, 41, 91, 93, 123, 125, 46, 42, 43, 63, 124, 94, 36, 92, 45]
 
@@ -457,6 +458,11 @@ fun declared () =
 @test fun aTokenIsMatchedExactly () =
   -- `+` means a plus sign, not "one or more of what came before".
   assertEq (quoted "a+b") "a\\+b" "the meta characters are escaped"
+
+@test fun aTokenOfACharacterOfSeveralBytesIsThatCharacter () =
+  -- `∞` is three bytes; each on its own is no character, and was lost.
+  let a = assertEq (quoted "\u{221e}") "\u{221e}" "the character as it is" in
+  assertEq (quoted "a\u{221e}+") "a\u{221e}\\+" "beside an escaped one"
 
 @test fun aVariantWithNoPatternIsRefused () =
   match patternOf [Word "Plus" Nowhere] with

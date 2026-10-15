@@ -25,6 +25,7 @@ data Token
   | @token("let") Let
   | @regex("[0-9]+(\\.[0-9]+)?") Number String
   | @regex("[a-zA-Z_][a-zA-Z0-9_]*") Ident String
+  | @token("\u{221e}") Infinity
 
 fun main () =
   let input = "let rate = 2.5 * (x + 40) -- how much\n" in
@@ -54,3 +55,10 @@ fun unwrap r = match r with | Ok x -> x | Err _ -> None
   let b = assertEq (reachToken "2.5x" 0) 3 "a number with its fraction" in
   let c = assertEq (reachToken "2.x" 0) 1 "the fraction it could not finish is given back" in
   assertEq (reachToken "?" 0) 0 "nothing at all"
+
+-- `@token` with a character of several bytes matches that character.
+@test fun aTokenOfAWideCharacterIsRead () =
+  assertEq
+    (match lexToken "1 \u{221e}" with | Ok ts -> V.map token ts | Err _ -> [])
+    [Token.Number "1", Token.Infinity]
+    "the number, and the infinity sign"
