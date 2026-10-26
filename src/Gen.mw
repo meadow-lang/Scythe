@@ -67,7 +67,8 @@ fun skipsOf ts =
 fun attributeArgs ts name =
   V.foldl
     (\acc i ->
-      if isWord name (V.getOr (Punct "" Nowhere) ts i) and isPunct "@" (V.getOr (Punct "" Nowhere) ts (i - 1)) then
+      if isWord name (V.getOr (Punct "" Nowhere) ts i)
+        and isPunct "@" (V.getOr (Punct "" Nowhere) ts (i - 1)) then
         match literalIn (V.getOr (Punct "" Nowhere) ts (i + 1)) with
         | Just s -> V.pushBack acc s
         | None -> acc
@@ -91,8 +92,7 @@ fun literalIn t =
 fun patterns variants skips =
   match collect variants 0 [] with
   | Err why -> Err why
-  | Ok res ->
-      collectSkips skips (V.len variants) res
+  | Ok res -> collectSkips skips (V.len variants) res
 
 fun collect variants at sofar =
   if at >= V.len variants then Ok sofar
@@ -155,8 +155,7 @@ fun patternOf v =
 -- text before it is bytes.
 fun quoted s = V.foldl (\acc c -> acc ++ escaped c) "" (S.chars s)
 
-fun escaped c =
-  if V.elem (C.code c) metaBytes then "\\${C.toString c}" else C.toString c
+fun escaped c = if V.elem (C.code c) metaBytes then "\\${C.toString c}" else C.toString c
 
 def metaBytes = [40, 41, 91, 93, 123, 125, 46, 42, 43, 63, 124, 94, 36, 92, 45]
 
@@ -268,8 +267,7 @@ fun ${t}Next ${tables packed} (input : String) (n : Int) (at : Int) =
 -- Written out rather than left to inference, because a state that never reads
 -- the class table would otherwise be generic in it, and every call to it an
 -- instantiation where one monomorphic function would do.
-fun tables packed =
-  if packed then "(c : String) (l : String)" else "(c : Array Int) (l : String)"
+fun tables packed = if packed then "(c : String) (l : String)" else "(c : Array Int) (l : String)"
 
 -- The states with an edge back to themselves, numbered: each is given the bit
 -- `slot % 7` of loop table `slot / 7`. -1 for a state that does not loop.
@@ -302,8 +300,8 @@ fun loopByte d slots tbl b =
   V.foldl
     (\acc s ->
       let slot = V.getOr (0 - 1) slots s in
-      if slot >= 0 and slot / 7 == tbl and arrayGet trans (s * wide + cls) == s
-      then acc + pow2 (slot % 7)
+      if slot >= 0 and slot / 7 == tbl and arrayGet trans (s * wide + cls) == s then
+        acc + pow2 (slot % 7)
       else acc)
     0
     (V.range 0 (V.len slots))
@@ -319,15 +317,19 @@ fun stateFun t d slots packed s =
   -- A state that does not accept notes where it is, while nothing has matched
   -- yet: where the machine stops, when nothing does, is where logos ends the
   -- error it makes (see `reach…`).
-  let noted = if accept >= 0 then "i * 65536 + ${show (accept + 1)}" else "if best % 65536 == 0 then i * 65536 else best" in
+  let noted =
+    if accept >= 0 then "i * 65536 + ${show (accept + 1)}"
+    else "if best % 65536 == 0 then i * 65536 else best"
+  in
   let loop =
     if slot < 0 then ""
     else
       "    if bitAnd (toInt (stringByteAt l (${show (256 * (slot / 7))} + b))) ${show (pow2 (slot % 7))} != 0
     then ${me} c l input n (i + 1) here
-    else\n" in
-      let klass = if packed then "toInt (stringByteAt c b)" else "arrayGet c b" in
-      "fun ${me} ${tables packed} (input : String) (n : Int) (i : Int) (best : Int) : Int =
+    else\n"
+  in
+  let klass = if packed then "toInt (stringByteAt c b)" else "arrayGet c b" in
+  "fun ${me} ${tables packed} (input : String) (n : Int) (i : Int) (best : Int) : Int =
   let here = ${noted} in
   if i >= n then here
   else
@@ -345,17 +347,17 @@ fun dispatch t d s klass =
         let to = arrayGet trans (s * wide + c) in
         if to < 0 or to == s or V.elem to acc then acc else V.pushBack acc to)
       []
-      (V.range 0 wide) in
-    if V.isEmpty targets then "    here"
-    else
-      let arms =
-        V.map
-        (\to ->
-          let cs = V.filter (\c -> arrayGet trans (s * wide + c) == to) (V.range 0 wide) in
-          let test = S.join " or " (V.map (\c -> "k == ${show c}") cs) in
-          "if ${test} then ${t}S${show to} c l input n (i + 1) here")
-        targets in
-        "    let k = ${klass} in\n    ${S.join "\n    else " arms}\n    else here"
+      (V.range 0 wide)
+  in if V.isEmpty targets then "    here"
+     else
+       let arms =
+         V.map
+           (\to ->
+             let cs = V.filter (\c -> arrayGet trans (s * wide + c) == to) (V.range 0 wide) in
+             let test = S.join " or " (V.map (\c -> "k == ${show c}") cs) in
+             "if ${test} then ${t}S${show to} c l input n (i + 1) here")
+           targets
+       in "    let k = ${klass} in\n    ${S.join "\n    else " arms}\n    else here"
 
 -- `if id == 0 then Type.Plus else …`, and a token that takes the text is given
 -- it. The last arm needs no test: the table answers with nothing else.
@@ -364,12 +366,12 @@ fun arms name variants ids =
   | Nil -> "${name}"
   | Cons _ _ ->
       V.foldl
-      (\acc i ->
-        let ctor = build name (V.getOr [] variants i) in
-        if i + 1 == V.len ids then "${acc}${ctor}"
-        else "${acc}if id == ${show i} then ${ctor} else ")
-      ""
-      ids
+        (\acc i ->
+          let ctor = build name (V.getOr [] variants i) in
+          if i + 1 == V.len ids then "${acc}${ctor}"
+          else "${acc}if id == ${show i} then ${ctor} else ")
+        ""
+        ids
 
 fun build name v =
   let ctor = ctorOf v in
@@ -378,9 +380,7 @@ fun build name v =
 -- The variant's name: the first word that is not an attribute's.
 fun ctorOf v =
   let after = V.dropWhile (\t -> not (isCtorStart v t)) v in
-  match V.get after 0 with
-  | Just t -> text t
-  | None -> "?"
+  match V.get after 0 with | Just t -> text t | None -> "?"
 
 fun isCtorStart v t =
   match t with
@@ -409,9 +409,7 @@ fun isUpper w =
   | Just b -> b >= 65 and b <= 90
   | None -> False
 
-fun lower w =
-  if S.isEmpty w then w
-  else S.toLower (S.take w 1) ++ S.drop w 1
+fun lower w = if S.isEmpty w then w else S.toLower (S.take w 1) ++ S.drop w 1
 
 -- --- writing the table out -----------------------------------------------------
 
@@ -429,12 +427,27 @@ use Scythe.Regex.Re.*
 
 -- The declaration above, as the tokens a derive is given.
 fun declared () =
-  [Punct "@" Nowhere, Word "derive" Nowhere, Group Paren [Word "Lexer" Nowhere] Nowhere,
-    Punct "@" Nowhere, Word "skip" Nowhere, Group Paren [Str " +" Nowhere] Nowhere,
-    Word "data" Nowhere, Word "Token" Nowhere, Punct "=" Nowhere,
-    Punct "@" Nowhere, Word "token" Nowhere, Group Paren [Str "+" Nowhere] Nowhere, Word "Plus" Nowhere,
+  [
+    Punct "@" Nowhere,
+    Word "derive" Nowhere,
+    Group Paren [Word "Lexer" Nowhere] Nowhere,
+    Punct "@" Nowhere,
+    Word "skip" Nowhere,
+    Group Paren [Str " +" Nowhere] Nowhere,
+    Word "data" Nowhere,
+    Word "Token" Nowhere,
+    Punct "=" Nowhere,
+    Punct "@" Nowhere,
+    Word "token" Nowhere,
+    Group Paren [Str "+" Nowhere] Nowhere,
+    Word "Plus" Nowhere,
     Punct "|" Nowhere,
-    Punct "@" Nowhere, Word "regex" Nowhere, Group Paren [Str "[0-9]+" Nowhere] Nowhere, Word "Number" Nowhere, Word "String" Nowhere]
+    Punct "@" Nowhere,
+    Word "regex" Nowhere,
+    Group Paren [Str "[0-9]+" Nowhere] Nowhere,
+    Word "Number" Nowhere,
+    Word "String" Nowhere
+  ]
 
 @test fun aDeclarationIsReadForItsNameAndVariants () =
   match declaration (declared ()) with
@@ -470,7 +483,12 @@ fun declared () =
   | Ok _ -> assertTrue False "it should have been refused"
 
 @test fun aPatternThatIsNotOneIsRefused () =
-  match patternOf [Punct "@" Nowhere, Word "regex" Nowhere, Group Paren [Str "[a" Nowhere] Nowhere, Word "Bad" Nowhere] with
+  match patternOf [
+    Punct "@" Nowhere,
+    Word "regex" Nowhere,
+    Group Paren [Str "[a" Nowhere] Nowhere,
+    Word "Bad" Nowhere
+  ] with
   | Err why -> assertTrue (S.contains "not a pattern" why) why
   | Ok _ -> assertTrue False "it should have been refused"
 
@@ -482,8 +500,14 @@ fun declared () =
       | Err why -> assertTrue False why
       | Ok res ->
           let out = written name skips variants (compile res) in
-          let a = assertTrue (S.contains "@pub fun lexToken input" out) "a function named for the type" in
-          let b = assertTrue (S.contains "fun scytheTokenS0 " out and S.contains "packBytes" out) "a function per state, and a packed table" in
+          let a =
+            assertTrue (S.contains "@pub fun lexToken input" out) "a function named for the type"
+          in
+          let b =
+            assertTrue
+              (S.contains "fun scytheTokenS0 " out and S.contains "packBytes" out)
+              "a function per state, and a packed table"
+          in
           let c = assertTrue (S.contains "Token.Plus" out) "a constructor with no text" in
           assertTrue (S.contains "(Token.Number (stringSlice input at upto))" out) "and one with it"
 
@@ -511,9 +535,32 @@ fun declared () =
   assertTrue (S.contains "toInt (stringByteAt c b)" out) "and read a byte at a time"
 
 @test fun aVariantWrittenSkipIsMatchedAndLeftOut () =
-  let space = [Punct "@" Nowhere, Word "regex" Nowhere, Group Paren [Str "[ ]+" Nowhere] Nowhere, Punct "@" Nowhere, Word "skip" Nowhere, Word "Space" Nowhere] in
-  let plus = [Punct "@" Nowhere, Word "token" Nowhere, Group Paren [Str "+" Nowhere] Nowhere, Word "Plus" Nowhere] in
-  let kept = [Punct "@" Nowhere, Word "regex" Nowhere, Group Paren [Str "[ ]+" Nowhere] Nowhere, Word "Space" Nowhere] in
+  let space =
+    [
+      Punct "@" Nowhere,
+      Word "regex" Nowhere,
+      Group Paren [Str "[ ]+" Nowhere] Nowhere,
+      Punct "@" Nowhere,
+      Word "skip" Nowhere,
+      Word "Space" Nowhere
+    ]
+  in
+  let plus =
+    [
+      Punct "@" Nowhere,
+      Word "token" Nowhere,
+      Group Paren [Str "+" Nowhere] Nowhere,
+      Word "Plus" Nowhere
+    ]
+  in
+  let kept =
+    [
+      Punct "@" Nowhere,
+      Word "regex" Nowhere,
+      Group Paren [Str "[ ]+" Nowhere] Nowhere,
+      Word "Space" Nowhere
+    ]
+  in
   let a = assertEq (skippedIds [space, plus]) [0] "the one written `@skip`" in
   let b = assertEq (skippedIds [kept, plus]) [] "whitespace without it is a token" in
   assertEq (ctorOf space) "Space" "`skip` is not taken for the constructor"

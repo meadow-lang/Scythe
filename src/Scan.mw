@@ -39,8 +39,7 @@ use Error.*
 --
 -- `skip` is the token numbers to drop -- whitespace, comments -- and `make`
 -- builds a token from its number and the text that matched it.
-@pub fun scan d skip make input =
-  scanFrom d skip make input (stringByteLength input) 0 []
+@pub fun scan d skip make input = scanFrom d skip make input (stringByteLength input) 0 []
 
 fun scanFrom d skip make (input : String) (n : Int) (at : Int) sofar =
   if at >= n then Ok sofar
@@ -109,14 +108,17 @@ use Scythe.Regex (parse)
 use Scythe.Regex.Re.*
 
 fun table patterns =
-  compile (V.map (\p -> match p with | (id, text) ->
-      (id, match parse text with | Ok re -> re | Err _ -> Empty)) patterns)
+  compile
+    (V.map
+       (\p ->
+         match p with
+         | (id, text) -> (id, match parse text with | Ok re -> re | Err _ -> Empty))
+       patterns)
 
 @test fun aScanIsEveryTokenInOrder () =
   let d = table [(0, "[0-9]+"), (1, "\\+"), (2, " +")] in
   let out = scan d #[2] (\id text -> (id, text)) "1 + 23" in
-  assertEq (V.map token (unwrap out)) [(0, "1"), (1, "+"), (0, "23")]
-    "three tokens, no spaces"
+  assertEq (V.map token (unwrap out)) [(0, "1"), (1, "+"), (0, "23")] "three tokens, no spaces"
 
 @test fun whatMatchesNothingIsAnError () =
   let d = table [(0, "[0-9]+")] in

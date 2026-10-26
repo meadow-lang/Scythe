@@ -93,8 +93,8 @@ use Scythe.Regex.Re.*
       -- `,` ends a number, `-` opens a negative one, and anything else is a digit.
       if b == 44 then go (i + 1) (V.pushBack out (signed cur neg)) 0 False False
       else if b == 45 then go (i + 1) out cur True any
-      else go (i + 1) out (cur * 10 + (b - 48)) neg True in
-      V.toArray (go 0 [] 0 False False)
+      else go (i + 1) out (cur * 10 + (b - 48)) neg True
+  in V.toArray (go 0 [] 0 False False)
 
 fun signed cur neg = if neg then 0 - cur else cur
 
@@ -120,8 +120,7 @@ fun fresh n =
 
 fun addMove n from lo hi to =
   match n with
-  | Nfa moves eps ->
-      Nfa (V.updateAt moves from (\ms -> V.pushBack ms (lo, hi, to))) eps
+  | Nfa moves eps -> Nfa (V.updateAt moves from (\ms -> V.pushBack ms (lo, hi, to))) eps
 
 fun addEps n from to =
   match n with
@@ -132,9 +131,7 @@ fun addEps n from to =
 fun build n from re =
   match re with
   | Empty -> (n, from)
-  | Lit b ->
-      let (n1, to) = fresh n in
-      (addMove n1 from b b to, to)
+  | Lit b -> let (n1, to) = fresh n in (addMove n1 from b b to, to)
   | Class negated ranges ->
       let (n1, to) = fresh n in
       let rs = if negated then complement ranges else ranges in
@@ -142,15 +139,17 @@ fun build n from re =
   | Cat rs -> V.foldl (\acc r -> match acc with | (m, at) -> build m at r) (n, from) rs
   | Alt rs ->
       let (n1, out) = fresh n in
-      (V.foldl
-        (\m r ->
-          let (m1, entry) = fresh m in
-          let m2 = addEps m1 from entry in
-          let (m3, ended) = build m2 entry r in
-          addEps m3 ended out)
-        n1
-        rs,
-        out)
+      (
+        V.foldl
+          (\m r ->
+            let (m1, entry) = fresh m in
+            let m2 = addEps m1 from entry in
+            let (m3, ended) = build m2 entry r in
+            addEps m3 ended out)
+          n1
+          rs,
+        out
+      )
   | Star r ->
       -- One state that is both the way in and the way out, so it accepts nothing
       -- as readily as it accepts many.
@@ -207,7 +206,10 @@ fun closeAll eclose states = uniq (sort (V.concatMap (\s -> V.getOr [] eclose s)
 -- A sorted vector with its repeats taken out.
 fun uniq v =
   V.foldl
-    (\acc x -> match V.last acc with | Just y -> if x == y then acc else V.pushBack acc x | None -> V.pushBack acc x)
+    (\acc x ->
+      match V.last acc with
+      | Just y -> if x == y then acc else V.pushBack acc x
+      | None -> V.pushBack acc x)
     []
     v
 
@@ -222,13 +224,16 @@ fun lettersOf rows =
     V.foldl
       (\acc ms ->
         V.foldl
-          (\inner m -> match m with | (lo, hi, _) -> V.pushBack (V.pushBack inner lo) (hi + 1))
+          (\inner m ->
+            match m with
+            | (lo, hi, _) -> V.pushBack (V.pushBack inner lo) (hi + 1))
           acc
           ms)
       [0]
-      rows in
-    let points = sort (V.filter (\p -> p <= 255) edges) in
-    intervals (uniq points) []
+      rows
+  in
+  let points = sort (V.filter (\p -> p <= 255) edges) in
+  intervals (uniq points) []
 
 fun intervals points sofar =
   match V.toList points with
@@ -242,7 +247,9 @@ fun intervals points sofar =
 -- its last byte's.
 fun letterIndex letters =
   V.concatMap
-    (\i -> match V.getOr (0, 0) letters i with | (lo, hi) -> V.replicate (hi - lo + 1) i)
+    (\i ->
+      match V.getOr (0, 0) letters i with
+      | (lo, hi) -> V.replicate (hi - lo + 1) i)
     (V.range 0 (V.len letters))
 
 -- The machine `patterns` make, with each state saying which token it accepts.
@@ -264,11 +271,12 @@ fun letterIndex letters =
                 let (m3, ended) = build m2 entry re in
                 (m3, V.pushBack es (ended, id)))
       (start, [])
-      patterns in
-    let (moves, accepts) = subset n ends in
-    let (moves1, accepts1) = prune moves accepts in
-    let (moves2, accepts2) = minimize moves1 accepts1 in
-    tabulate moves2 accepts2
+      patterns
+  in
+  let (moves, accepts) = subset n ends in
+  let (moves1, accepts1) = prune moves accepts in
+  let (moves2, accepts2) = minimize moves1 accepts1 in
+  tabulate moves2 accepts2
 
 fun subset n ends =
   let letters = alphabet n in
@@ -299,25 +307,32 @@ fun explore ctx todo seen moves accepts =
           let buckets = targets nmoves letterOf (V.len letters) states in
           let (rows, todo1, seen1) =
             V.foldl
-            (\acc0 i ->
-              match acc0 with
-              | (rs, queue, known) ->
-                  let hit = V.getOr [] buckets i in
-                  if V.isEmpty hit then acc0
-                  else
-                    let to = closeAll eclose hit in
-                    let lo = match V.getOr (0, 0) letters i with | (l, _) -> l in
-                    let hi = match V.getOr (0, 0) letters i with | (_, h) -> h in
-                    match M.lookup (key to) known with
-                    | Just id -> (V.pushBack rs (lo, hi, id), queue, known)
-                    | None ->
-                        let id = M.size known in
-                        (V.pushBack rs (lo, hi, id),
-                          V.pushBack queue to,
-                          M.insert (key to) id known))
-            ([], V.fromList rest, seen)
-            (V.range 0 (V.len letters)) in
-            explore ctx todo1 seen1 (V.pushBack moves rows) (V.pushBack accepts (accepting acc states))
+              (\acc0 i ->
+                match acc0 with
+                | (rs, queue, known) ->
+                    let hit = V.getOr [] buckets i in
+                    if V.isEmpty hit then acc0
+                    else
+                      let to = closeAll eclose hit in
+                      let lo = match V.getOr (0, 0) letters i with | (l, _) -> l in
+                      let hi = match V.getOr (0, 0) letters i with | (_, h) -> h in
+                      match M.lookup (key to) known with
+                      | Just id -> (V.pushBack rs (lo, hi, id), queue, known)
+                      | None ->
+                          let id = M.size known in
+                          (
+                            V.pushBack rs (lo, hi, id),
+                            V.pushBack queue to,
+                            M.insert (key to) id known
+                          ))
+              ([], V.fromList rest, seen)
+              (V.range 0 (V.len letters))
+          in explore
+               ctx
+               todo1
+               seen1
+               (V.pushBack moves rows)
+               (V.pushBack accepts (accepting acc states))
 
 -- For each letter, the states `states` move to on it: every edge of every
 -- state, dropped into the letters its range covers.
@@ -369,10 +384,9 @@ fun liveFix moves live =
     V.map
       (\i ->
         V.getOr False live i
-        or V.any (\m -> match m with | (_, _, to) -> V.getOr False live to)
-            (V.getOr [] moves i))
-      (V.range 0 (V.len live)) in
-    if countTrue next == countTrue live then next else liveFix moves next
+          or V.any (\m -> match m with | (_, _, to) -> V.getOr False live to) (V.getOr [] moves i))
+      (V.range 0 (V.len live))
+  in if countTrue next == countTrue live then next else liveFix moves next
 
 fun countTrue v = V.foldl (\acc b -> if b then acc + 1 else acc) 0 v
 
@@ -380,28 +394,29 @@ fun countTrue v = V.foldl (\acc b -> if b then acc + 1 else acc) 0 v
 fun keepStates moves accepts live =
   let ids = renumber live in
   let kept = V.filter (\i -> V.getOr False live i) (V.range 0 (V.len live)) in
-  (V.map
-    (\i ->
-      -- The edges that survive are chosen by the *old* number, and only then
-      -- renumbered: asking `ids` about a number it has already answered for
-      -- would be asking it the wrong question.
-      V.map
-        (\m -> match m with | (lo, hi, to) -> (lo, hi, V.getOr none ids to))
-        (V.filter
-          (\m -> match m with | (_, _, to) -> V.getOr none ids to >= 0)
-          (V.getOr [] moves i)))
-    kept,
-    V.map (\i -> V.getOr none accepts i) kept)
+  (
+    V.map
+      (\i ->
+        -- The edges that survive are chosen by the *old* number, and only then
+        -- renumbered: asking `ids` about a number it has already answered for
+        -- would be asking it the wrong question.
+        V.map
+          (\m -> match m with | (lo, hi, to) -> (lo, hi, V.getOr none ids to))
+          (V.filter
+             (\m -> match m with | (_, _, to) -> V.getOr none ids to >= 0)
+             (V.getOr [] moves i)))
+      kept,
+    V.map (\i -> V.getOr none accepts i) kept
+  )
 
 -- Old state numbers to new ones, or to -1 for the ones being dropped.
 fun renumber live =
-  match
-    V.foldl
-      (\acc b -> match acc with | (ids, next) ->
-          if b then (V.pushBack ids next, next + 1) else (V.pushBack ids none, next))
-      ([], 0)
-      live
-  with
+  match V.foldl
+    (\acc b ->
+      match acc with
+      | (ids, next) -> if b then (V.pushBack ids next, next + 1) else (V.pushBack ids none, next))
+    ([], 0)
+    live with
   | (ids, _) -> ids
 
 -- --- merging equivalent states --------------------------------------------------
@@ -420,25 +435,24 @@ fun minimize moves accepts =
     let rewritten =
       V.map
         (\row -> V.map (\m -> match m with | (lo, hi, to) -> (lo, hi, V.getOr 0 canon to)) row)
-        moves in
-      let live = V.map (\i -> V.getOr 0 canon i == i) (V.range 0 (V.len accepts)) in
-      let (moves1, accepts1) = keepStates rewritten accepts live in
-      minimize moves1 accepts1
+        moves
+    in
+    let live = V.map (\i -> V.getOr 0 canon i == i) (V.range 0 (V.len accepts)) in
+    let (moves1, accepts1) = keepStates rewritten accepts live in
+    minimize moves1 accepts1
 
 -- For each state, the first state it is indistinguishable from.
 fun canonical moves accepts =
-  match
-    V.foldl
-      (\acc i ->
-        match acc with
-        | (ids, seen) ->
-            let k = stateKey moves accepts i in
-            match M.lookup k seen with
-            | Just first -> (V.pushBack ids first, seen)
-            | None -> (V.pushBack ids i, M.insert k i seen))
-      ([], M.empty)
-      (V.range 0 (V.len accepts))
-  with
+  match V.foldl
+    (\acc i ->
+      match acc with
+      | (ids, seen) ->
+          let k = stateKey moves accepts i in
+          match M.lookup k seen with
+          | Just first -> (V.pushBack ids first, seen)
+          | None -> (V.pushBack ids i, M.insert k i seen))
+    ([], M.empty)
+    (V.range 0 (V.len accepts)) with
   | (ids, _) -> ids
 
 -- A state as text: what it accepts and where it goes. The rows are built in one
@@ -446,7 +460,9 @@ fun canonical moves accepts =
 fun stateKey moves accepts i =
   "${show (V.getOr none accepts i)}|${S.join "," (V.map showMove (V.getOr [] moves i))}"
 
-fun showMove m = match m with | (lo, hi, to) -> "${show lo}-${show hi}>${show to}"
+fun showMove m =
+  match m with
+  | (lo, hi, to) -> "${show lo}-${show hi}>${show to}"
 
 -- --- laying the table out flat ---------------------------------------------------
 
@@ -487,11 +503,13 @@ fun mergeClasses classOf trans wide states =
   else
     -- The first old class that was given each new number stands for it.
     let firsts = V.map (\c -> firstWith ids c) (V.range 0 narrow) in
-    (V.map (\c -> V.getOr 0 ids c) classOf,
+    (
+      V.map (\c -> V.getOr 0 ids c) classOf,
       V.concatMap
         (\s -> V.map (\old -> V.getOr none trans (s * wide + old)) firsts)
         (V.range 0 states),
-      narrow)
+      narrow
+    )
 
 fun firstWith ids c =
   V.foldl
@@ -501,18 +519,16 @@ fun firstWith ids c =
 
 -- Each class's new number: classes with the same column share one.
 fun columnIds trans wide states =
-  match
-    V.foldl
-      (\acc c ->
-        match acc with
-        | (ids, seen, next) ->
-            let k = columnKey trans wide states c in
-            match M.lookup k seen with
-            | Just id -> (V.pushBack ids id, seen, next)
-            | None -> (V.pushBack ids next, M.insert k next seen, next + 1))
-      ([], M.empty, 0)
-      (V.range 0 wide)
-  with
+  match V.foldl
+    (\acc c ->
+      match acc with
+      | (ids, seen, next) ->
+          let k = columnKey trans wide states c in
+          match M.lookup k seen with
+          | Just id -> (V.pushBack ids id, seen, next)
+          | None -> (V.pushBack ids next, M.insert k next seen, next + 1))
+    ([], M.empty, 0)
+    (V.range 0 wide) with
   | (ids, _, _) -> ids
 
 fun columnKey trans wide states c =
@@ -546,8 +562,11 @@ fun columnKey trans wide states c =
 -- The same, from `at` in bytes already taken apart, as a pair: the token, or -1,
 -- and where it ended.
 @pub fun longestFrom d bytes at =
-  let r = match d with | Dfa classOf trans accepts wide -> walkBytes classOf trans accepts wide bytes (arrayLen bytes) 0 at 0 in
-  if r == 0 then (none, at) else (matchId r, matchEnd r)
+  let r =
+    match d with
+    | Dfa classOf trans accepts wide ->
+        walkBytes classOf trans accepts wide bytes (arrayLen bytes) 0 at 0
+  in if r == 0 then (none, at) else (matchId r, matchEnd r)
 
 -- The longest match in `input` from byte `at`, packed: what a scanner calls,
 -- once per token. The string is read where it is, a byte at a time, rather
@@ -559,7 +578,17 @@ fun columnKey trans wide states c =
 
 -- One state of the walk. The accept is read on entering a state, so the best
 -- match so far is always the last accepting state passed through.
-fun walk classOf trans accepts (wide : Int) (input : String) (n : Int) (state : Int) (i : Int) (best : Int) : Int =
+fun walk
+    classOf
+    trans
+    accepts
+    (wide : Int)
+    (input : String)
+    (n : Int)
+    (state : Int)
+    (i : Int)
+    (best : Int)
+    : Int =
   let acc = arrayGet accepts state in
   let best1 = if acc >= 0 then packMatch i acc else best in
   if i >= n then best1
@@ -568,7 +597,17 @@ fun walk classOf trans accepts (wide : Int) (input : String) (n : Int) (state : 
     if to < 0 then best1 else walk classOf trans accepts wide input n to (i + 1) best1
 
 -- The same over bytes already in an array.
-fun walkBytes classOf trans accepts (wide : Int) bytes (n : Int) (state : Int) (i : Int) (best : Int) : Int =
+fun walkBytes
+    classOf
+    trans
+    accepts
+    (wide : Int)
+    bytes
+    (n : Int)
+    (state : Int)
+    (i : Int)
+    (best : Int)
+    : Int =
   let acc = arrayGet accepts state in
   let best1 = if acc >= 0 then packMatch i acc else best in
   if i >= n then best1
@@ -589,8 +628,12 @@ use Std.Test (assertEq, assertTrue)
 use Scythe.Regex (parse)
 
 fun dfaOf patterns =
-  compile (V.map (\p -> match p with | (id, text) ->
-      (id, match parse text with | Ok re -> re | Err _ -> Empty)) patterns)
+  compile
+    (V.map
+       (\p ->
+         match p with
+         | (id, text) -> (id, match parse text with | Ok re -> re | Err _ -> Empty))
+       patterns)
 
 @test fun aLiteralMatchesItself () =
   let d = dfaOf [(0, "abc")] in
@@ -678,9 +721,11 @@ fun dfaOf patterns =
   -- machine it was written from.
   let d = dfaOf [(0, "let"), (1, "[a-z]+")] in
   let rebuilt =
-    Dfa (readInts (S.join "," (V.map show (V.fromArray (dfaClassOf d)))))
-        (readInts (S.join "," (V.map show (V.fromArray (dfaTrans d)))))
-        (readInts (S.join "," (V.map show (V.fromArray (dfaAccepts d)))))
-        (dfaClasses d) in
-    let a = assertEq (longest rebuilt "let") (longest d "let") "the keyword" in
-    assertEq (longest rebuilt "letter") (longest d "letter") "and the identifier"
+    Dfa
+      (readInts (S.join "," (V.map show (V.fromArray (dfaClassOf d)))))
+      (readInts (S.join "," (V.map show (V.fromArray (dfaTrans d)))))
+      (readInts (S.join "," (V.map show (V.fromArray (dfaAccepts d)))))
+      (dfaClasses d)
+  in
+  let a = assertEq (longest rebuilt "let") (longest d "let") "the keyword" in
+  assertEq (longest rebuilt "letter") (longest d "letter") "and the identifier"
