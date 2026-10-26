@@ -34,9 +34,7 @@ use Re.*
   let bytes = V.map toInt (V.fromArray (S.toBytes pattern)) in
   match alternation bytes 0 with
   | Err e -> Err e
-  | Ok (re, at) ->
-      if at == V.len bytes then Ok re
-      else Err "a `)` with no `(` before it"
+  | Ok (re, at) -> if at == V.len bytes then Ok re else Err "a `)` with no `(` before it"
 
 -- `a|b|c`
 fun alternation bytes at =
@@ -95,8 +93,7 @@ fun group bytes at =
   match alternation bytes at with
   | Err e -> Err e
   | Ok (re, next) ->
-      if byteAt bytes next == 41 then Ok (re, next + 1)
-      else Err "a `(` with no `)` after it"
+      if byteAt bytes next == 41 then Ok (re, next + 1) else Err "a `(` with no `)` after it"
 
 -- `[abc]`, `[a-z0-9_]`, `[^ \t]`
 fun charClass bytes at =
@@ -105,8 +102,7 @@ fun charClass bytes at =
   match classItems bytes from [] with
   | Err e -> Err e
   | Ok (ranges, next) ->
-      if V.isEmpty ranges then Err "a class with nothing in it"
-      else Ok (Class negated ranges, next)
+      if V.isEmpty ranges then Err "a class with nothing in it" else Ok (Class negated ranges, next)
 
 fun classItems bytes at sofar =
   let b = byteAt bytes at in
@@ -117,8 +113,9 @@ fun classItems bytes at sofar =
     | Err e -> Err e
     | Ok (lo, next) ->
         -- `a-z`, but a `-` before the `]` is just a hyphen.
-        if byteAt bytes next == 45 and byteAt bytes (next + 1) != 93
-        and byteAt bytes (next + 1) != (0 - 1) then
+        if byteAt bytes next == 45
+          and byteAt bytes (next + 1) != 93
+          and byteAt bytes (next + 1) != (0 - 1) then
           match classByte bytes (next + 1) with
           | Err e -> Err e
           | Ok (hi, after) ->
@@ -166,11 +163,7 @@ fun escape bytes at =
   else Ok (Lit (unescape b), at + 1)
 
 fun unescape b =
-  if b == 110 then 10
-  else if b == 116 then 9
-  else if b == 114 then 13
-  else if b == 48 then 0
-  else b
+  if b == 110 then 10 else if b == 116 then 9 else if b == 114 then 13 else if b == 48 then 0 else b
 
 @pub def digits = [(48, 57)]
 @pub def wordBytes = [(48, 57), (65, 90), (95, 95), (97, 122)]
@@ -184,11 +177,9 @@ fun byteAt bytes i = V.getOr (0 - 1) bytes i
 
 use Std.Test (assertEq, assertTrue)
 
-@test fun aLiteralIsItsBytes () =
-  assertEq (parse "ab") (Ok (Cat [Lit 97, Lit 98])) "two bytes"
+@test fun aLiteralIsItsBytes () = assertEq (parse "ab") (Ok (Cat [Lit 97, Lit 98])) "two bytes"
 
-@test fun oneByteNeedsNoSequence () =
-  assertEq (parse "a") (Ok (Lit 97)) "one byte"
+@test fun oneByteNeedsNoSequence () = assertEq (parse "a") (Ok (Lit 97)) "one byte"
 
 @test fun repetitionsAreWrittenOut () =
   let a = assertEq (parse "a*") (Ok (Star (Lit 97))) "star" in

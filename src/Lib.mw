@@ -7,13 +7,11 @@ mod Gen
 
 @pub use Scythe.Regex (parse)
 @pub use Scythe.Automaton (
-  readInts,
-  Dfa, compile, longest, longestFrom, matchFrom, packMatch, matchId, matchEnd, next, bytesOf,
-  packBytes,
-  dfaClassOf, dfaTrans, dfaAccepts, dfaClasses, dfaStates,
+  readInts, Dfa, compile, longest, longestFrom, matchFrom, packMatch, matchId, matchEnd, next,
+  bytesOf, packBytes, dfaClassOf, dfaTrans, dfaAccepts, dfaClasses, dfaStates,
 )
 @pub use Scythe.Scan (
-  Lexed, Error, scan, foldScan, token, start, stop, errorAt,
-  noTokens, pushToken, scanned, stuckAt, found, ended,
+  Lexed, Error, scan, foldScan, token, start, stop, errorAt, noTokens, pushToken, scanned, stuckAt,
+  found, ended,
 )
 @pub use Scythe.Gen (lexer)
