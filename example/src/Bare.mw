@@ -1,0 +1,32 @@
+-- A lexer derived in a module that brings in nothing of Scythe's but the macro.
+--
+-- What `@derive(Lexer)` writes names Scythe's helpers itself, so it does not
+-- lean on what the module it is written into happens to import. The token
+-- declaration is a small one, as a user would write it first.
+
+use Scythe (lexer!)
+
+@derive(Lexer)
+data Word
+  = @regex(" \n\t\r*") Whitespace
+  | @regex("[0-9]+") Num
+
+-- --- tests -------------------------------------------------------------------
+
+use Scythe (token, errorAt)
+use Std.Collections.Vector as V
+use Std.Test (assertEq)
+
+fun kinds input =
+  match lexWord input with
+  | Ok ts -> Ok (V.map token ts)
+  | Err e -> Err (errorAt e)
+
+@test fun aLexerIsDerivedWithOnlyTheMacroInScope () =
+  assertEq (kinds " \n\t\r\r12") (Ok [Word.Whitespace, Word.Num]) "the space, then the number"
+
+-- A pattern is a sequence unless it is written as a class: `" \n\t\r*"` is a
+-- space, a newline and a tab, then any number of `\r`. One space on its own is
+-- not that, and the lexer stops there. `[ \n\t\r]*` is the class.
+@test fun aPatternIsASequenceUnlessItIsAClass () =
+  assertEq (kinds "1 2") (Err 1) "a lone space is not the whitespace pattern"
