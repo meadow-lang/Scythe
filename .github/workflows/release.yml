@@ -1,0 +1,60 @@
+# A release for each version `master` reaches: when the `version` in
+# `Meadow.toml` has no tag `v<version>` yet, this tags the commit and publishes
+# a GitHub release of it, with notes made from the pull requests since the last.
+#
+# `meadow add` takes a git dependency at its newest release tag, so a version
+# is not out until it is tagged. Raising the version in a pull request is how
+# one is released: nothing reaches `master` that the merge queue did not test,
+# and a push that leaves the version alone does nothing here.
+
+name: release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: version
+        # The `version` of `[package]`, not of a dependency's table.
+        run: |
+          version=$(awk '
+            /^\[/ { section = $0 }
+            section == "[package]" && /^version[ \t]*=/ {
+              sub(/^version[ \t]*=[ \t]*"/, ""); sub(/".*/, ""); print; exit
+            }' Meadow.toml)
+          if [ -z "$version" ]; then
+            echo "::error::Meadow.toml has no [package] version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1 \
+            || git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null; then
+            echo "v$VERSION is out already"
+            exit 0
+          fi
+          gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "Scythe $VERSION" \
+            --generate-notes
