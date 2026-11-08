@@ -19,7 +19,7 @@
 mod Baseline
 
 use Scythe (lexer!, token, errorAt)
-use LogosBench.Baseline (oldCompile, oldScan)
+use ScytheBench.Baseline (oldCompile, oldScan)
 use Scythe.Regex (parse)
 use Scythe.Regex.Re.*
 use Std.Time (monotonic)
