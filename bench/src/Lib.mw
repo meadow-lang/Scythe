@@ -5,7 +5,7 @@
 --
 --   * **before** -- the engine as it was, kept in `Baseline.mw`;
 --   * **after** -- the same grammar through `@derive(Lexer)`, collecting the
---     tokens into a vector with `lexToken`;
+--     tokens into a vector with `lexTokenAll`;
 --   * **after, kinds only** -- the same again from a declaration whose variants
 --     carry no text;
 --   * **fold** and **fold, kinds only** -- the same two, but counting the
@@ -128,17 +128,17 @@ fun main () =
   if bytes == 0 then
     println "corpus.calc is not where this expects it: run `meadow run` from `bench/`."
   else
-    let tokens = countOf (lexToken text) in
+    let tokens = countOf (lexTokenAll text) in
     let _ = println "corpus.calc: ${show bytes} bytes, ${show tokens} tokens" in
     -- Two lexers that disagree about how many tokens are in the file are not
     -- lexing the same thing, and neither number below would mean anything.
-    let agree = countOf (oldLex text) == tokens and countOf (lexKind text) == tokens in
+    let agree = countOf (oldLex text) == tokens and countOf (lexKindAll text) == tokens in
     let _ = println "all three agree on the count: ${show agree}" in
     let _ = println "" in
     let _ = println "${pad 22 "lexer"}${pad 12 "best"}${pad 14 "throughput"}" in
     let _ = run "before" bytes 3 (\() -> countOf (oldLex text)) in
-    let _ = run "after" bytes 5 (\() -> countOf (lexToken text)) in
-    let _ = run "after, kinds only" bytes 5 (\() -> countOf (lexKind text)) in
+    let _ = run "after" bytes 5 (\() -> countOf (lexTokenAll text)) in
+    let _ = run "after, kinds only" bytes 5 (\() -> countOf (lexKindAll text)) in
     -- The same tokens, counted as they come rather than collected: what the
     -- Rust bench does with logos's iterator, and so the like-for-like row.
     let _ = run "fold" bytes 20 (\() -> foldedOf (foldToken (\k t a b -> k + 1) 0 text)) in

@@ -19,6 +19,7 @@ use Std.Collections.Vector as V
 use Std.String as S
 use Std.Maybe.Maybe.*
 use Std.Result.Result.*
+use Std.Stream (yield)
 use Scythe.Automaton (Dfa, matchFrom, matchId, matchEnd)
 use Lexed.*
 use Error.*
@@ -99,6 +100,12 @@ fun skipped skip (id : Int) (i : Int) : Bool =
 @pub fun found t (at : Int) (upto : Int) = Ok (Just (Lexed t at upto))
 
 @pub fun ended () = Ok None
+
+-- What `lex…` yields: a token and where it was; or where the input stopped
+-- making sense, which is the last thing yielded.
+@pub fun yieldFound t (at : Int) (upto : Int) = yield (Ok (Lexed t at upto))
+
+@pub fun yieldStuck (at : Int) = yield (Err (Unexpected at))
 
 -- --- tests -------------------------------------------------------------------
 

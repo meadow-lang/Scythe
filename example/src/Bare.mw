@@ -18,7 +18,7 @@ use Std.Collections.Vector as V
 use Std.Test (assertEq)
 
 fun kinds input =
-  match lexWord input with
+  match lexWordAll input with
   | Ok ts -> Ok (V.map token ts)
   | Err e -> Err (errorAt e)
 

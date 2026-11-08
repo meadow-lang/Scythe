@@ -14,8 +14,10 @@
 --       = @token("+") Plus
 --       | @regex("[0-9]+") Number String
 --
--- and what it writes beside it is `lexToken : String -> Result Error [Lexed Token]`
--- and `foldToken`, the same tokens one at a time.
+-- and what it writes beside it is `lexToken`, the tokens as a stream that
+-- `Std.Stream` consumes, one at a time as they are read;
+-- `lexTokenAll : String -> Result Error [Lexed Token]`, all of them at once;
+-- and `foldToken`, the tokens one at a time into an accumulator.
 -- A variant with a `String` field is given the text that matched it; one with
 -- no fields is given nothing.
 
@@ -191,7 +193,9 @@ fun written name skips variants d =
   let slots = loopSlots d in
   let packed = wide < 128 in
   let classes = if packed then "packBytes" else "readInts" in
-  "use Scythe (packBytes, readInts, noTokens, pushToken, scanned, stuckAt, found, ended)
+  "use Scythe (
+  packBytes, readInts, noTokens, pushToken, scanned, stuckAt, found, ended, yieldFound, yieldStuck,
+)
 
 -- A byte's class: bytes no pattern tells apart share one.
 def ${t}Classes = ${classes} \"${showArray (dfaClassOf d)}\"
@@ -239,8 +243,27 @@ fun ${t}Next ${tables packed} (input : String) (n : Int) (at : Int) =
     else if ${t}Skipped id then ${t}Next c l input n upto
     else found (${t}Make id input at upto) at upto
 
--- Every token in `input`, or where it stopped making sense.
-@pub fun lex${name} input =
+fun ${t}Stream ${tables packed} (input : String) (n : Int) (at : Int) =
+  if at >= n then ()
+  else
+    let r = ${t}S0 c l input n at 0 in
+    let id = r % 65536 - 1 in
+    let upto = r / 65536 in
+    if id < 0 or upto <= at then yieldStuck at
+    else if ${t}Skipped id then ${t}Stream c l input n upto
+    else
+      let more = yieldFound (${t}Make id input at upto) at upto in
+      ${t}Stream c l input n upto
+
+-- The tokens of `input` as a stream (`Std.Stream`): each is yielded as it is
+-- read, as `Ok (Lexed token start stop)`, and where the input stops making
+-- sense, `Err` of where, and nothing after it. A consumer that stops asking
+-- stops the lexing: `Stream.take 3 (lexToken input)` reads three tokens.
+@pub fun lex${name} input () =
+  ${t}Stream ${t}Classes ${t}Loops input (stringByteLength input) 0
+
+-- Every token in `input` at once, or where it stopped making sense.
+@pub fun lex${name}All input =
   ${t}Go ${t}Classes ${t}Loops input (stringByteLength input) 0 noTokens
 
 -- The tokens one at a time, into `f acc token start stop`, keeping none of
