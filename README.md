@@ -14,11 +14,17 @@ data Token
   | @regex("[a-zA-Z_][a-zA-Z0-9_]*") Ident String
 ```
 
-That writes `lexToken : String -> Result Error [Lexed Token]` beside the
-declaration:
+That writes `lexToken` beside the declaration: the tokens as a
+[`Std.Stream`](https://github.com/meadow-lang/meadow/blob/master/lib/Std/src/Stream.mw),
+each yielded as it is read.
 
 ```meadow
-lexToken "let x 1 + 23"
+use Std.Stream as Stream
+
+Stream.toVec (lexToken "let x 1 + 23")
+-- [Ok Let, Ok Ident("x"), Ok Number("1"), Ok Plus, Ok Number("23")], each a `Lexed`
+
+lexTokenAll "let x 1 + 23"
 -- Ok [Let, Ident("x"), Number("1"), Plus, Number("23")]
 ```
 
@@ -59,17 +65,25 @@ Two rules decide what a token is, and they are logos's:
 ## What you get
 
 ```meadow
-@pub fun lexToken : String -> Result Error [Lexed Token]
+@pub fun lexToken : String -> () -> () ! { Yield (Result Error (Lexed Token)) | e }
+@pub fun lexTokenAll : String -> Result Error [Lexed Token]
 @pub fun foldToken : (acc -> Token -> Int -> Int -> acc) -> acc -> String -> Result Error acc
 @pub fun nextToken : String -> Int -> Result Error (Maybe (Lexed Token))
 @pub fun reachToken : String -> Int -> Int
 ```
 
-- `lexToken` — every token, with where it was.
+- `lexToken input` — the tokens as a stream, for `Std.Stream`'s consumers
+  (`forEach`, `fold`, `take`, `toVec`, ...): each is yielded as it is read, as
+  `Ok` of the token and where it was. Where the input stops making sense,
+  `Err` of where, and nothing after. This is logos's `Lexer`, an iterator of
+  results. A consumer that stops asking stops the lexer:
+  `Stream.take 3 (lexToken input)` reads three tokens and no more.
+- `lexTokenAll input` — every token at once, with where it was, or where the
+  input stopped making sense.
 - `foldToken f acc input` — the tokens one at a time, into
-  `f acc token start stop`, keeping none of them. This is logos's `Lexer`, an
-  iterator, and it is the one to reach for when nothing needs every token at
-  once: it skips building the vector, which is most of what `lexToken` costs.
+  `f acc token start stop`, keeping none of them. A stream without the
+  handler: the one to reach for where every bit of speed counts. It skips
+  building the vector, which is most of what `lexTokenAll` costs.
 - `nextToken input at` — the one token at byte `at`, past anything skipped,
   or `None` at the end. logos's `Lexer::next` after a `bump`: what a lexer is
   made of that reads part of a text with one set of tokens and part with
@@ -154,8 +168,8 @@ Expect, compiled with `--release --runtime aot`:
 | --------------------------------- | ------------ |
 | `foldKind` — kinds, iterated      | **~60 MB/s** |
 | `foldToken` — with their text     | ~44 MB/s     |
-| `lexKind` — collected             | ~43 MB/s     |
-| `lexToken` — collected, with text | ~35 MB/s     |
+| `lexKindAll` — collected          | ~43 MB/s     |
+| `lexTokenAll` — collected, text   | ~35 MB/s     |
 
 and on the default runtime (`meadow run --release`), about **25 MB/s**
 iterating and 12 MB/s collecting.
@@ -170,8 +184,8 @@ makes the rows worth comparing. Meadow is built with `--release --runtime aot`
 | lexer                                            | best    | throughput |
 | ------------------------------------------------ | ------- | ---------- |
 | meadow, the first engine (`before` in the bench) | 38.5 ms | 1.3 MB/s   |
-| meadow, `lexToken`                               | 1.4 ms  | 35 MB/s    |
-| meadow, `lexKind` (no token carries text)        | 1.1 ms  | 43 MB/s    |
+| meadow, `lexTokenAll`                            | 1.4 ms  | 35 MB/s    |
+| meadow, `lexKindAll` (no token carries text)     | 1.1 ms  | 43 MB/s    |
 | meadow, `foldToken`                              | 1.1 ms  | 44 MB/s    |
 | meadow, `foldKind`                               | 810 µs  | 61 MB/s    |
 | rust logos                                       | 76 µs   | 645 MB/s   |
